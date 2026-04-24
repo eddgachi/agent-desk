@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import AboutView from '../views/AboutView.vue'
 import OfficeView from '../views/OfficeView.vue'
 
 const routes = [
@@ -10,6 +11,11 @@ const routes = [
     path: '/office',
     name: 'Office',
     component: OfficeView,
+  },
+  {
+    path: '/about',
+    name: 'About',
+    component: AboutView,
   },
 ]
 

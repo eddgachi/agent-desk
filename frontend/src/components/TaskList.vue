@@ -19,8 +19,7 @@
         <!-- Title + status -->
         <div class="flex items-start justify-between gap-1 mb-1">
           <span class="text-gray-200 text-xs font-medium leading-snug flex-1">{{ task.title }}</span>
-          <span class="flex-none text-xs px-1.5 py-0.5 rounded font-medium"
-                :class="statusClass(task.status)">
+          <span class="flex-none text-xs px-1.5 py-0.5 rounded font-medium" :class="statusClass(task.status)">
             {{ task.status }}
           </span>
         </div>
@@ -37,11 +36,12 @@
         </div>
 
         <!-- Progress bar for in-progress tasks -->
-        <div v-if="task.status === 'in_progress' && task.remaining_ticks != null"
-             class="mt-1.5 flex items-center gap-2">
+        <div
+          v-if="task.status === 'in_progress' && task.remaining_ticks != null"
+          class="mt-1.5 flex items-center gap-2"
+        >
           <div class="flex-1 bg-gray-700 rounded-full h-1">
-            <div class="h-1 rounded-full bg-blue-500 transition-all"
-                 :style="{ width: taskPct(task) + '%' }" />
+            <div class="h-1 rounded-full bg-blue-500 transition-all" :style="{ width: taskPct(task) + '%' }" />
           </div>
           <span class="text-gray-500 tabular-nums text-xs">{{ task.remaining_ticks }}t</span>
         </div>
@@ -59,11 +59,10 @@ const simStore = useSimulationStore()
 const STATUS_ORDER = { in_progress: 0, assigned: 1, pending: 2, completed: 3, failed: 4 }
 
 const taskList = computed(() =>
-  Object.values(simStore.tasks)
-    .sort((a, b) => {
-      const so = (STATUS_ORDER[a.status] ?? 5) - (STATUS_ORDER[b.status] ?? 5)
-      return so !== 0 ? so : b.priority - a.priority
-    })
+  Object.values(simStore.tasks).sort((a, b) => {
+    const so = (STATUS_ORDER[a.status] ?? 5) - (STATUS_ORDER[b.status] ?? 5)
+    return so !== 0 ? so : b.priority - a.priority
+  }),
 )
 
 function agentName(id) {
@@ -77,12 +76,14 @@ function taskPct(task) {
 }
 
 function statusClass(status) {
-  return {
-    pending:     'bg-gray-800 text-gray-400',
-    assigned:    'bg-sky-900/60 text-sky-300',
-    in_progress: 'bg-blue-900/60 text-blue-300',
-    completed:   'bg-emerald-900/40 text-emerald-500',
-    failed:      'bg-red-900/60 text-red-400',
-  }[status] ?? 'bg-gray-800 text-gray-400'
+  return (
+    {
+      pending: 'bg-gray-800 text-gray-400',
+      assigned: 'bg-sky-900/60 text-sky-300',
+      in_progress: 'bg-blue-900/60 text-blue-300',
+      completed: 'bg-emerald-900/40 text-emerald-500',
+      failed: 'bg-red-900/60 text-red-400',
+    }[status] ?? 'bg-gray-800 text-gray-400'
+  )
 }
 </script>

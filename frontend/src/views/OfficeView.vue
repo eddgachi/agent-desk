@@ -1,11 +1,11 @@
 <template>
-  <div class="flex flex-col h-screen overflow-hidden bg-gray-950 text-gray-200 select-none">
-
-    <!-- ── Header ───────────────────────────────────────── -->
-    <header class="flex-none flex items-center justify-between px-4 h-11
-                   bg-gray-900 border-b border-gray-800 z-10 shadow-md">
-      <div class="flex items-center gap-3">
-        <span class="text-blue-400 font-bold text-sm tracking-widest uppercase">AgentDesk</span>
+  <div class="flex flex-col h-screen overflow-hidden bg-gray-900 text-gray-200 select-none">
+    <!-- ── Header (dark navbar) ────────────────────────── -->
+    <header
+      class="flex-none flex items-center justify-between px-4 h-11 bg-gray-900 border-b border-gray-800 z-10 shadow-md"
+    >
+      <div class="flex items-center gap-4">
+        <span class="text-indigo-400 font-bold text-sm tracking-widest uppercase">AgentDesk</span>
         <span class="text-gray-700">│</span>
         <span class="text-gray-500 text-xs">Office Simulation</span>
       </div>
@@ -13,16 +13,16 @@
       <div class="flex items-center gap-5 text-xs">
         <!-- Tick counter -->
         <div class="flex items-center gap-1.5 text-gray-400">
-          <span class="text-gray-600">TICK</span>
-          <span class="font-mono font-bold text-gray-200 tabular-nums w-10 text-right">
+          <span class="text-gray-500">TICK</span>
+          <span class="font-mono font-bold text-gray-100 tabular-nums w-10 text-right">
             {{ simStore.currentTick }}
           </span>
         </div>
 
         <!-- Agent count -->
         <div class="flex items-center gap-1.5 text-gray-400">
-          <span class="text-gray-600">AGENTS</span>
-          <span class="font-bold text-gray-200">{{ agentCount }}</span>
+          <span class="text-gray-500">AGENTS</span>
+          <span class="font-bold text-gray-100">{{ agentCount }}</span>
         </div>
 
         <!-- Running state -->
@@ -37,27 +37,40 @@
         </div>
 
         <!-- WS connection -->
-        <div class="flex items-center gap-1.5"
-             :class="wsStore.connected ? 'text-emerald-400' : wsStore.reconnecting ? 'text-yellow-400' : 'text-red-400'">
-          <span class="w-1.5 h-1.5 rounded-full"
-                :class="wsStore.connected ? 'bg-emerald-400'
-                        : wsStore.reconnecting ? 'bg-yellow-400 animate-pulse'
-                        : 'bg-red-400'" />
+        <div
+          class="flex items-center gap-1.5"
+          :class="wsStore.connected ? 'text-emerald-400' : wsStore.reconnecting ? 'text-amber-400' : 'text-red-400'"
+        >
+          <span
+            class="w-1.5 h-1.5 rounded-full"
+            :class="
+              wsStore.connected ? 'bg-emerald-400' : wsStore.reconnecting ? 'bg-amber-400 animate-pulse' : 'bg-red-400'
+            "
+          />
           <span>{{ wsStore.connected ? 'Live' : wsStore.reconnecting ? 'Reconnecting…' : 'Offline' }}</span>
         </div>
+
+        <!-- Nav links -->
+        <router-link
+          to="/about"
+          class="ml-2 px-2.5 py-1 rounded text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
+        >
+          About
+        </router-link>
       </div>
     </header>
 
     <!-- ── Body ─────────────────────────────────────────── -->
     <div class="flex flex-1 min-h-0 overflow-hidden">
-
-      <!-- Canvas area -->
-      <main class="flex-1 flex items-center justify-center bg-gray-950 p-3 overflow-hidden">
+      <!-- Canvas area (takes all remaining space) -->
+      <main class="flex-1 flex items-center justify-center bg-gray-800 p-2 overflow-hidden">
         <OfficeMap />
       </main>
 
-      <!-- Right sidebar -->
-      <aside class="flex-none w-72 flex flex-col gap-0 bg-gray-900 border-l border-gray-800 overflow-y-auto scrollbar-thin">
+      <!-- Right sidebar (dark) -->
+      <aside
+        class="flex-none w-64 flex flex-col gap-0 bg-gray-900 border-l border-gray-800 overflow-y-auto scrollbar-thin"
+      >
         <ControlPanel />
         <div class="border-t border-gray-800" />
         <AgentInspector />
@@ -66,8 +79,8 @@
       </aside>
     </div>
 
-    <!-- ── Activity feed ─────────────────────────────────── -->
-    <footer class="flex-none h-32 border-t border-gray-800 bg-gray-900">
+    <!-- ── Activity feed (dark) ─────────────────────────── -->
+    <footer class="flex-none h-36 border-t border-gray-800 bg-gray-900">
       <EventFeed />
     </footer>
   </div>
@@ -75,16 +88,16 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted } from 'vue'
-import { useSimulationStore } from '../stores/simulation'
-import { useWsStore } from '../stores/ws'
 import AgentInspector from '../components/AgentInspector.vue'
 import ControlPanel from '../components/ControlPanel.vue'
 import EventFeed from '../components/EventFeed.vue'
 import OfficeMap from '../components/OfficeMap.vue'
 import TaskList from '../components/TaskList.vue'
+import { useSimulationStore } from '../stores/simulation'
+import { useWsStore } from '../stores/ws'
 
 const simStore = useSimulationStore()
-const wsStore  = useWsStore()
+const wsStore = useWsStore()
 
 const agentCount = computed(() => Object.keys(simStore.agents).length)
 

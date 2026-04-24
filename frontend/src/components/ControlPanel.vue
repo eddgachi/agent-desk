@@ -4,21 +4,19 @@
 
     <!-- Action buttons -->
     <div class="grid grid-cols-2 gap-1.5">
-      <button class="btn-success col-span-1"
-              :disabled="simStore.loading || simStore.isRunning"
-              @click="handlePlay">▶ Play</button>
+      <button class="btn-success col-span-1" :disabled="simStore.loading || simStore.isRunning" @click="handlePlay">
+        ▶ Play
+      </button>
 
-      <button class="btn-danger col-span-1"
-              :disabled="simStore.loading || !simStore.isRunning"
-              @click="handlePause">⏸ Pause</button>
+      <button class="btn-danger col-span-1" :disabled="simStore.loading || !simStore.isRunning" @click="handlePause">
+        ⏸ Pause
+      </button>
 
-      <button class="btn-ghost col-span-1"
-              :disabled="simStore.loading || simStore.isRunning"
-              @click="handleTick">⏭ Step</button>
+      <button class="btn-ghost col-span-1" :disabled="simStore.loading || simStore.isRunning" @click="handleTick">
+        ⏭ Step
+      </button>
 
-      <button class="btn-ghost col-span-1"
-              :disabled="simStore.loading"
-              @click="handleReset">↺ Reset</button>
+      <button class="btn-ghost col-span-1" :disabled="simStore.loading" @click="handleReset">↺ Reset</button>
     </div>
 
     <!-- Speed control -->
@@ -28,21 +26,27 @@
         <span class="text-gray-300 font-mono">{{ SPEEDS[speedIdx] }}× / tick</span>
       </div>
       <input
-        type="range" min="0" max="4" step="1"
-        class="w-full accent-blue-500 cursor-pointer"
+        type="range"
+        min="0"
+        max="4"
+        step="1"
+        class="w-full accent-indigo-500 cursor-pointer"
         :value="speedIdx"
         @input="onSpeedChange"
       />
-      <div class="flex justify-between text-gray-700" style="font-size:9px; letter-spacing:0.02em">
+      <div class="flex justify-between text-gray-600" style="font-size: 9px; letter-spacing: 0.02em">
         <span v-for="s in SPEEDS" :key="s">{{ s }}×</span>
       </div>
     </div>
 
     <!-- Status strip -->
-    <div class="flex items-center justify-between text-xs text-gray-500 pt-1 border-t border-gray-800">
-      <span>Tick <strong class="text-gray-300 tabular-nums">{{ simStore.currentTick }}</strong></span>
-      <span>Tasks <strong class="text-gray-300">{{ taskCounts.total }}</strong>
-            <span class="text-emerald-500 ml-1">✓{{ taskCounts.done }}</span>
+    <div class="flex items-center justify-between text-xs text-gray-500 pt-1.5 border-t border-gray-800">
+      <span
+        >Tick <strong class="text-gray-200 tabular-nums">{{ simStore.currentTick }}</strong></span
+      >
+      <span
+        >Tasks <strong class="text-gray-200">{{ taskCounts.total }}</strong>
+        <span class="text-emerald-400 ml-1">✓{{ taskCounts.done }}</span>
       </span>
     </div>
   </div>
@@ -54,7 +58,7 @@ import { useSimulationStore } from '../stores/simulation'
 import { useUiStore } from '../stores/ui'
 
 const simStore = useSimulationStore()
-const uiStore  = useUiStore()
+const uiStore = useUiStore()
 
 const SPEEDS = [0.25, 0.5, 1.0, 2.0, 4.0]
 const speedIdx = ref(2)
@@ -63,7 +67,7 @@ const taskCounts = computed(() => {
   const tasks = Object.values(simStore.tasks)
   return {
     total: tasks.length,
-    done:  tasks.filter(t => t.status === 'completed').length,
+    done: tasks.filter((t) => t.status === 'completed').length,
   }
 })
 

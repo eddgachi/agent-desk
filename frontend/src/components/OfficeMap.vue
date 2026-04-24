@@ -27,10 +27,10 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { tickInterpolation } from '../canvas/useAgentInterpolation.js'
-import { useAnimationLoop } from '../canvas/useAnimationLoop.js'
 import { CANVAS_H, CANVAS_W } from '../canvas/officeLayout.js'
 import { AGENT_RADIUS, renderFrame } from '../canvas/renderer.js'
+import { tickInterpolation } from '../canvas/useAgentInterpolation.js'
+import { useAnimationLoop } from '../canvas/useAnimationLoop.js'
 import { useSimulationStore } from '../stores/simulation'
 import { useUiStore } from '../stores/ui'
 
@@ -41,9 +41,9 @@ const canvasRef = ref(null)
 const tooltip = ref(null)
 
 // Responsive: scale canvas to fit window while keeping aspect ratio
-const MAX_W = 860
+const MAX_W = 1100
 const aspect = CANVAS_H / CANVAS_W
-const displayW = computed(() => Math.min(MAX_W, window.innerWidth - 320))
+const displayW = computed(() => Math.min(MAX_W, window.innerWidth - 260))
 const displayH = computed(() => Math.round(displayW.value * aspect))
 
 // Scale factor from CSS display size → canvas pixel coords
