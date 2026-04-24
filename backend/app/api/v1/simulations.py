@@ -6,10 +6,27 @@ from app.simulation.core.state_manager import (
     create_simulation,
     get_simulation,
     reset_simulation,
+    start_auto_loop,
+    stop_auto_loop,
 )
 from fastapi import APIRouter, HTTPException
 
 router = APIRouter(prefix="/simulations", tags=["simulations"])
+
+
+@router.post("/{sim_id}/start")
+def start_simulation_auto(sim_id: str, interval: float = 0.5):
+    # Check sim exists
+    if not get_simulation(sim_id):
+        raise HTTPException(404, "Simulation not found")
+    start_auto_loop(sim_id, interval)
+    return {"status": "auto loop started", "sim_id": sim_id, "interval": interval}
+
+
+@router.post("/{sim_id}/stop")
+def stop_simulation_auto(sim_id: str):
+    stop_auto_loop(sim_id)
+    return {"status": "auto loop stopped", "sim_id": sim_id}
 
 
 @router.post("/", response_model=schemas.SimulationResponse)

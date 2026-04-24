@@ -14,6 +14,8 @@
       <h3>Events</h3>
       <pre>{{ events }}</pre>
     </div>
+    <button @click="startAuto">Start Auto Tick (0.5s)</button>
+    <button @click="stopAuto">Stop Auto Tick</button>
   </div>
 </template>
 
@@ -26,6 +28,13 @@ const currentTick = ref(0)
 const agents = ref({})
 const tasks = ref({})
 const events = ref([])
+
+async function startAuto() {
+  await apiClient.post(`/api/v1/simulations/${simId.value}/start`, null, { params: { interval: 0.5 } })
+}
+async function stopAuto() {
+  await apiClient.post(`/api/v1/simulations/${simId.value}/stop`)
+}
 
 async function createSim() {
   const res = await apiClient.post('/api/v1/simulations', { seed: 42 })

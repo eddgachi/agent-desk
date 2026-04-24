@@ -1,6 +1,8 @@
+import asyncio
 import uuid
 from typing import Dict, Optional
 
+from app.simulation.core.engine import process_tick
 from app.simulation.core.random_gen import clear_rng, get_rng
 from app.simulation.models.simulation_state import (
     Agent,
@@ -11,6 +13,34 @@ from app.simulation.models.simulation_state import (
 )
 
 _state_store: Dict[str, SimulationState] = {}
+_loop_tasks: Dict[str, asyncio.Task] = {}
+_loop_stop_flags: Dict[str, bool] = {}
+
+
+async def _run_auto_loop(sim_id: str, interval_seconds: float):
+    while not _loop_stop_flags.get(sim_id, False):
+        await asyncio.sleep(interval_seconds)
+        # Apply tick (using existing apply_tick)
+        try:
+            apply_tick(sim_id)
+        except Exception as e:
+            print(f"Error in auto loop for {sim_id}: {e}")
+            break
+
+
+def start_auto_loop(sim_id: str, interval_seconds: float = 0.5):
+    if sim_id in _loop_tasks and not _loop_tasks[sim_id].done():
+        return  # already running
+    _loop_stop_flags[sim_id] = False
+    task = asyncio.create_task(_run_auto_loop(sim_id, interval_seconds))
+    _loop_tasks[sim_id] = task
+
+
+def stop_auto_loop(sim_id: str):
+    if sim_id in _loop_tasks:
+        _loop_stop_flags[sim_id] = True
+        _loop_tasks[sim_id].cancel()
+        del _loop_tasks[sim_id]
 
 
 def create_simulation(seed: int) -> SimulationState:
@@ -86,7 +116,10 @@ def apply_tick(sim_id: str) -> int:
     state = get_simulation(sim_id)
     if not state:
         raise ValueError("Simulation not found")
-    # For Phase 2, just increment tick (engine will do more in Phase 3)
-    state.current_tick += 1
+    rng = get_rng(
+        sim_id, state.seed
+    )  # note: get_rng requires sim_id and seed; adjust earlier implementation
+    # In random_gen.py, we used _rng_store[sim_id] = SeededRNG(seed). Ensure get_rng works.
+    state = process_tick(state, rng)
     update_simulation(state)
     return state.current_tick

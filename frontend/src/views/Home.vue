@@ -14,7 +14,7 @@ const healthStatus = ref('Not yet checked')
 
 async function checkHealth() {
   try {
-    const res = await apiClient.get('/health')
+    const res = await apiClient.get('/health/')
     healthStatus.value = JSON.stringify(res.data, null, 2)
   } catch (err) {
     healthStatus.value = 'Error: ' + err.message

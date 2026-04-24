@@ -19,11 +19,17 @@ class Agent(BaseModel):
     role: str
     position_x: float
     position_y: float
+    target_x: Optional[float] = None
+    target_y: Optional[float] = None
     status: AgentStatus
     current_task_id: Optional[str] = None
-    energy: int = 100  # 0-100
-    focus: int = 100  # 0-100
-    assigned_tasks: List[str] = []  # task ids
+    remaining_task_ticks: Optional[int] = None  # only if working
+    energy: int = 100
+    focus: int = 100
+    assigned_tasks: List[str] = (
+        []
+    )  # task ids assigned but not started? We'll simplify: only one task at a time
+    # Actually we can remove assigned_tasks and just use current_task_id + status
 
 
 class TaskStatus(str, Enum):
