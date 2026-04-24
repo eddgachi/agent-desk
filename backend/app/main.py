@@ -18,6 +18,12 @@ app.add_middleware(
 )
 
 # Mount prometheus metrics
+from app.utils import metrics as sim_metrics
+from prometheus_client import Gauge, make_asgi_app
+
+HEARTBEAT = Gauge("backend_heartbeat", "Backend is alive")
+HEARTBEAT.set(1)
+
 metrics_app = make_asgi_app()
 app.mount("/metrics", metrics_app)
 
