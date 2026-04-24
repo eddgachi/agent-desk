@@ -244,6 +244,17 @@ def reset_simulation(sim_id: str) -> Optional[SimulationState]:
     return new
 
 
+def inject_task(sim_id: str, task: Task) -> Optional[Task]:
+    state = get_simulation(sim_id)
+    if not state:
+        return None
+    if task.id in state.tasks:
+        task.id = f"{task.id}_{uuid.uuid4().hex[:4]}"
+    state.tasks[task.id] = task
+    add_event(state, "task_injected", {"task_id": task.id, "title": task.title})
+    return task
+
+
 async def apply_tick(sim_id: str) -> int:
     """Process one tick, broadcast WS updates, return new tick number."""
     state = get_simulation(sim_id)
@@ -252,6 +263,10 @@ async def apply_tick(sim_id: str) -> int:
 
     rng = get_rng(sim_id, state.seed)
     events_before = len(state.event_log)
+
+    # Reset thinking status
+    for agent in state.agents.values():
+        agent.is_thinking = False
 
     process_tick(state, rng)
     update_simulation(state)
@@ -264,7 +279,44 @@ async def apply_tick(sim_id: str) -> int:
     # Broadcast tick state
     await ws_manager.broadcast_tick(sim_id, serialize_tick_update(state))
 
+    # ── Phase 8/9: Periodic LLM Explanations ──
+    if state.current_tick % 15 == 0:
+        rt = get_runtime(sim_id)
+        for agent in state.agents.values():
+            dec = rt.get_decisions(agent.id)
+            if dec and dec.use_llm:
+                # Set thinking status
+                agent.is_thinking = True
+                
+                # Run explanation in background to not block the simulation
+                asyncio.create_task(_run_explanation(sim_id, agent.id))
+
     return state.current_tick
+
+
+async def _run_explanation(sim_id: str, agent_id: str):
+    rt = get_runtime(sim_id)
+    state = get_simulation(sim_id)
+    if not rt or not state: return
+    
+    agent = state.agents.get(agent_id)
+    dec = rt.get_decisions(agent_id)
+    if not agent or not dec: return
+    
+    stats = {
+        "energy": agent.energy,
+        "focus": agent.focus,
+        "mood": agent.mood,
+        "status": agent.status.value
+    }
+    
+    result = await dec.generate_explanation(sim_id, stats)
+    if result:
+        agent.llm_explanation = result.get("explanation")
+        agent.llm_feeling = result.get("feeling")
+        agent.llm_next_plan = result.get("next_plan")
+    
+    agent.is_thinking = False
 
 
 # ── Auto-loop ──────────────────────────────────────────────

@@ -33,6 +33,12 @@ from app.simulation.llm.validators import (
     validate_summaries,
     validate_task_decision,
 )
+from app.utils.metrics import (
+    LLM_CALLS_TOTAL,
+    LLM_COST_ESTIMATE,
+    LLM_DECISIONS_VALID,
+    LLM_LATENCY_SECONDS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -108,8 +114,10 @@ class HybridDecisionEngine:
                 if validation["valid"]:
                     self._budget.spend()
                     rate_limiter.get_budget(sim_id).spend(cost=1.0)
+                    LLM_DECISIONS_VALID.labels(sim_id=sim_id, is_valid="true").inc()
                     return llm_result
 
+                LLM_DECISIONS_VALID.labels(sim_id=sim_id, is_valid="false").inc()
                 logger.debug(
                     "Agent %s LLM decision '%s' invalid: %s. Using fallback.",
                     self.agent_id,
@@ -244,15 +252,24 @@ class HybridDecisionEngine:
     async def _call_llm_structured(self, messages: list) -> Optional[dict]:
         if not self._llm:
             return None
-        try:
-            return await self._llm.chat_structured(messages)
-        except Exception as exc:
-            logger.error(
-                "LLM call failed for agent %s: %s",
-                self.agent_id,
-                exc,
-            )
-            return None
+        
+        sim_id = "default" # TODO: Pass sim_id if available or extract from context
+        call_type = "structured" # Simplified
+        
+        with LLM_LATENCY_SECONDS.labels(sim_id=sim_id, call_type=call_type).time():
+            try:
+                result = await self._llm.chat_structured(messages)
+                LLM_CALLS_TOTAL.labels(sim_id=sim_id, agent_id=self.agent_id, call_type=call_type).inc()
+                # Rough cost estimate ($0.001 per call as placeholder)
+                LLM_COST_ESTIMATE.labels(sim_id=sim_id).inc(0.001)
+                return result
+            except Exception as exc:
+                logger.error(
+                    "LLM call failed for agent %s: %s",
+                    self.agent_id,
+                    exc,
+                )
+                return None
 
     # ── Configuration ───────────────────────────────────────
 

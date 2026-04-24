@@ -36,6 +36,13 @@ from app.simulation.models.simulation_state import (
     SimulationState,
     TaskStatus,
 )
+from app.utils.metrics import (
+    AGENT_ENERGY_LEVEL,
+    AGENT_FOCUS_LEVEL,
+    SIM_AGENTS_ACTIVE,
+    SIM_TASKS_COMPLETED_TOTAL,
+    SIM_TICKS_TOTAL,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +116,7 @@ def process_tick(state: SimulationState, rng) -> SimulationState:
             if task:
                 task.status = TaskStatus.COMPLETED
                 task.completed_tick = state.current_tick
+                SIM_TASKS_COMPLETED_TOTAL.labels(sim_id=sim_id).inc()
                 add_event(
                     state,
                     "task_completed",
@@ -143,6 +151,7 @@ def process_tick(state: SimulationState, rng) -> SimulationState:
         if task.remaining_ticks <= 0:
             task.status = TaskStatus.COMPLETED
             task.completed_tick = state.current_tick
+            SIM_TASKS_COMPLETED_TOTAL.labels(sim_id=sim_id).inc()
             # Release all agents from the meeting
             for aid in list(task.checked_in_agent_ids):
                 agent = state.agents.get(aid)
@@ -261,4 +270,12 @@ def process_tick(state: SimulationState, rng) -> SimulationState:
         rt.sync_to_agents(state.agents)
 
     state.current_tick += 1
+
+    # 14. Record metrics
+    SIM_TICKS_TOTAL.labels(sim_id=sim_id).inc()
+    SIM_AGENTS_ACTIVE.labels(sim_id=sim_id).set(len(state.agents))
+    for agent in state.agents.values():
+        AGENT_ENERGY_LEVEL.labels(sim_id=sim_id, agent_id=agent.id).set(agent.energy)
+        AGENT_FOCUS_LEVEL.labels(sim_id=sim_id, agent_id=agent.id).set(agent.focus)
+
     return state

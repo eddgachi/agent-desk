@@ -12,11 +12,13 @@ from app.simulation.core.state_manager import (
     apply_tick,
     create_simulation,
     get_simulation,
+    inject_task,
     reset_simulation,
     start_auto_loop,
     stop_auto_loop,
 )
 from app.simulation.core.ws_manager import ws_manager
+from app.simulation.models.simulation_state import Task
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
 router = APIRouter(prefix="/simulations", tags=["simulations"])
@@ -74,6 +76,31 @@ async def stop_simulation_auto(sim_id: str):
         raise HTTPException(404, "Simulation not found")
     stop_auto_loop(sim_id)
     return {"status": "stopped", "sim_id": sim_id}
+
+
+@router.post("/{sim_id}/inject-task")
+async def inject_task_endpoint(sim_id: str, req: schemas.InjectTaskRequest):
+    import uuid
+    task = Task(
+        id=f"injected_{uuid.uuid4().hex[:6]}",
+        title=req.title,
+        type=req.type,
+        priority=req.priority,
+        duration_ticks=req.duration_ticks,
+        assigned_agent_id=req.assigned_agent_id,
+        required_role=req.required_role,
+        required_location=req.required_location
+    )
+    injected = inject_task(sim_id, task)
+    if not injected:
+        raise HTTPException(404, "Simulation not found")
+    
+    # Broadcast state for immediate feedback
+    state = get_simulation(sim_id)
+    if state:
+        await ws_manager.broadcast_snapshot(sim_id, serialize_state(state))
+        
+    return injected
 
 
 # ── Phase 7: Memory endpoints ──────────────────────────────

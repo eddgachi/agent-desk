@@ -70,6 +70,9 @@ class Agent(BaseModel):
     # Legacy working memory (simple text list)
     memory: List[str] = Field(default_factory=list)
 
+    # Thinking state (visual indicator for LLM activity)
+    is_thinking: bool = False
+
 
 class Task(BaseModel):
     id: str

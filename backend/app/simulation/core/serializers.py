@@ -33,6 +33,7 @@ def serialize_agent(agent: Agent) -> dict:
         "llm_explanation": agent.llm_explanation,
         "llm_feeling": agent.llm_feeling,
         "llm_next_plan": agent.llm_next_plan,
+        "is_thinking": agent.is_thinking,
     }
 
 
