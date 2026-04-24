@@ -420,14 +420,14 @@ furniture.forEach((f) => {
 
 // ── Named waypoints agents can target ─────────────────────
 export const waypoints = {
-  desk_A1: { x: 92, y: 155 },
-  desk_A2: { x: 210, y: 155 },
-  desk_A3: { x: 328, y: 155 },
-  desk_A4: { x: 446, y: 155 },
-  desk_B1: { x: 92, y: 275 },
-  desk_B2: { x: 210, y: 275 },
-  desk_B3: { x: 328, y: 275 },
-  desk_B4: { x: 446, y: 275 },
+  desk_A1: { x: 92, y: 110 },
+  desk_A2: { x: 210, y: 110 },
+  desk_A3: { x: 328, y: 110 },
+  desk_A4: { x: 446, y: 110 },
+  desk_B1: { x: 92, y: 230 },
+  desk_B2: { x: 210, y: 230 },
+  desk_B3: { x: 328, y: 230 },
+  desk_B4: { x: 446, y: 230 },
   meeting_a: { x: 726, y: 110 },
   meeting_b: { x: 726, y: 309 },
   breakroom: { x: 200, y: 530 },

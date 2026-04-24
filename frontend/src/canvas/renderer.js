@@ -176,7 +176,7 @@ function drawDoors(ctx) {
 }
 
 // ── Furniture ──────────────────────────────────────────────
-function drawFurniture(ctx, ts) {
+function drawFurniture(ctx, ts, agents) {
   furniture.forEach((f) => {
     ctx.save()
 
@@ -205,13 +205,13 @@ function drawFurniture(ctx, ts) {
       ctx.stroke()
 
       // Monitor
-      const monW = 22,
-        monH = 16
+      const monW = 24,
+        monH = 14
       const mX = f.x + (f.w - monW) / 2
       const mY = f.y + 6
       ctx.fillStyle = C.monitorFill
       ctx.strokeStyle = '#3a3a4a'
-      ctx.lineWidth = 1
+      ctx.lineWidth = 1.5
       roundRect(ctx, mX, mY, monW, monH, 2)
       ctx.fill()
       ctx.stroke()
@@ -221,6 +221,45 @@ function drawFurniture(ctx, ts) {
       ctx.fillStyle = `rgba(60, 130, 255, ${pulse})`
       roundRect(ctx, mX + 2, mY + 2, monW - 4, monH - 4, 1)
       ctx.fill()
+
+      // Desk Clutter if an agent is nearby
+      const assignedAgent = agents.find((a) => {
+        const dx = (a._renderX ?? a.position_x) - (f.x + f.w / 2)
+        const dy = (a._renderY ?? a.position_y) - (f.y + f.h / 2)
+        return Math.sqrt(dx * dx + dy * dy) < 60
+      })
+
+      if (assignedAgent) {
+        // Keyboard/Laptop
+        ctx.fillStyle = '#2a2a3a'
+        ctx.fillRect(f.x + (f.w - 20) / 2, f.y + 24, 20, 10)
+        ctx.strokeStyle = '#4a4a5a'
+        ctx.lineWidth = 0.5
+        ctx.strokeRect(f.x + (f.w - 20) / 2, f.y + 24, 20, 10)
+
+        // Coffee mug
+        ctx.fillStyle = assignedAgent.role === 'designer' ? '#fca5a5' : '#fff'
+        ctx.beginPath()
+        ctx.arc(f.x + 15, f.y + 35, 3.5, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.strokeStyle = '#d1d5db'
+        ctx.lineWidth = 1
+        ctx.stroke()
+        // Coffee in mug
+        ctx.fillStyle = '#4b2c20'
+        ctx.beginPath()
+        ctx.arc(f.x + 15, f.y + 35, 2, 0, Math.PI * 2)
+        ctx.fill()
+
+        // Steam (very subtle)
+        if (Math.sin(ts / 1000) > 0.5) {
+          ctx.strokeStyle = 'rgba(255,255,255,0.3)'
+          ctx.beginPath()
+          ctx.moveTo(f.x + 15, f.y + 30)
+          ctx.lineTo(f.x + 15 + Math.sin(ts / 300) * 2, f.y + 25)
+          ctx.stroke()
+        }
+      }
 
       // Desk label
       ctx.fillStyle = C.labelDesk
@@ -387,7 +426,7 @@ function drawAgents(ctx, agents, selectedId, ts) {
     const y = agent._renderY ?? agent.position_y
     ctx.save()
     ctx.beginPath()
-    ctx.ellipse(x, y + 2, 12, 5, 0, 0, Math.PI * 2)
+    ctx.ellipse(x, y + 2, 12, 6, 0, 0, Math.PI * 2)
     ctx.fillStyle = 'rgba(0,0,0,0.12)'
     ctx.fill()
     ctx.restore()
@@ -399,19 +438,22 @@ function drawAgents(ctx, agents, selectedId, ts) {
     const isSelected = agent.id === selectedId
     const x = agent._renderX ?? agent.position_x
     const y = agent._renderY ?? agent.position_y
+    const rot = agent._renderRot ?? 0
+    const isWorking = agent.status === 'working'
 
     ctx.save()
+    ctx.translate(x, y)
 
     // ── Selection glow ──
     if (isSelected) {
       const pulse = 0.3 + 0.2 * Math.sin(ts / 400)
       ctx.beginPath()
-      ctx.arc(x, y, 22 + pulse * 3, 0, Math.PI * 2)
+      ctx.arc(0, 0, 22 + pulse * 3, 0, Math.PI * 2)
       ctx.fillStyle = hexAlpha(colors.ring, 0.15 + pulse * 0.1)
       ctx.fill()
 
       // Rotation ring
-      ctx.translate(x, y)
+      ctx.save()
       ctx.rotate(ts / 1000)
       ctx.beginPath()
       ctx.arc(0, 0, 20, 0, Math.PI * 2)
@@ -419,128 +461,127 @@ function drawAgents(ctx, agents, selectedId, ts) {
       ctx.lineWidth = 2
       ctx.setLineDash([4, 6])
       ctx.stroke()
-      ctx.setLineDash([])
-      ctx.setTransform(1, 0, 0, 1, 0, 0)
+      ctx.restore()
     }
 
     // ── Activity glow ──
-    if (agent.status === 'working' || agent.status === 'meeting') {
+    if (isWorking || agent.status === 'meeting') {
       const pulse = 0.3 + 0.3 * Math.sin(ts / 500)
       ctx.beginPath()
-      ctx.arc(x, y, 18, 0, Math.PI * 2)
+      ctx.arc(0, 0, 18, 0, Math.PI * 2)
       ctx.fillStyle = hexAlpha(colors.body, 0.08 + pulse * 0.08)
       ctx.fill()
     }
 
-    // ★ LEGO FIGURE FROM TOP-DOWN ★
-    // Body: rounded rectangle (torso)
+    // ★ LEGO FIGURE WITH ROTATION ★
+    ctx.rotate(rot)
+
     const bodyW = 16
     const bodyH = 22
     const headR = 8
+    const typingOffset = isWorking ? Math.sin(ts / 150) * 2 : 0
 
-    // Body position (centered on x, y)
-    const bx = x - bodyW / 2
-    const by = y - bodyH / 2 + 2 // slightly offset so head sits above
-
-    // Head position (above body)
-    const hx = x
-    const hy = by - headR + 4
-
-    // ── Body ──
-    ctx.fillStyle = colors.body
-    ctx.strokeStyle = darken(colors.body, 0.2)
-    ctx.lineWidth = 1.5
-    roundRect(ctx, bx, by, bodyW, bodyH, 3)
-    ctx.fill()
-    ctx.stroke()
-
-    // Belt (horizontal line across body)
-    ctx.fillStyle = colors.belt
-    ctx.fillRect(bx + 2, by + bodyH - 7, bodyW - 4, 3)
-
-    // ── Arms (small rectangles on sides) ──
-    const armW = 4
-    const armH = 10
-    ctx.fillStyle = C.skinTone
-    ctx.strokeStyle = C.skinShadow
-    ctx.lineWidth = 1
-    // Left arm
-    roundRect(ctx, bx - armW + 1, by + 4, armW, armH, 2)
-    ctx.fill()
-    ctx.stroke()
-    // Right arm
-    roundRect(ctx, bx + bodyW - 1, by + 4, armW, armH, 2)
-    ctx.fill()
-    ctx.stroke()
-
-    // ── Legs (small rectangle below body) ──
+    // ── Legs ──
     const legW = 6
     const legH = 8
     ctx.fillStyle = darken(colors.body, 0.3)
     ctx.strokeStyle = darken(colors.body, 0.4)
     ctx.lineWidth = 1
     // Left leg
-    roundRect(ctx, x - legW - 1, by + bodyH - 2, legW, legH, 2)
+    roundRect(ctx, -legW - 1, bodyH / 2 - 4, legW, legH, 2)
     ctx.fill()
     ctx.stroke()
     // Right leg
-    roundRect(ctx, x + 1, by + bodyH - 2, legW, legH, 2)
+    roundRect(ctx, 1, bodyH / 2 - 4, legW, legH, 2)
     ctx.fill()
     ctx.stroke()
 
-    // ── Head ──
+    // ── Body ──
+    ctx.fillStyle = colors.body
+    ctx.strokeStyle = darken(colors.body, 0.2)
+    ctx.lineWidth = 1.5
+    roundRect(ctx, -bodyW / 2, -bodyH / 2 + 2, bodyW, bodyH, 3)
+    ctx.fill()
+    ctx.stroke()
+
+    // Belt
+    ctx.fillStyle = colors.belt
+    ctx.fillRect(-bodyW / 2 + 2, bodyH / 2 - 5, bodyW - 4, 3)
+
+    // ── Arms (Animated if working) ──
+    const armW = 4
+    const armH = 10
+    ctx.fillStyle = C.skinTone
+    ctx.strokeStyle = C.skinShadow
+    ctx.lineWidth = 1
+    // Left arm
+    ctx.save()
+    if (isWorking) ctx.translate(0, -typingOffset)
+    roundRect(ctx, -bodyW / 2 - armW + 1, -2, armW, armH, 2)
+    ctx.fill()
+    ctx.stroke()
+    ctx.restore()
+    // Right arm
+    ctx.save()
+    if (isWorking) ctx.translate(0, typingOffset)
+    roundRect(ctx, bodyW / 2 - 1, -2, armW, armH, 2)
+    ctx.fill()
+    ctx.stroke()
+    ctx.restore()
+
+    // ── Head (Subtle bob) ──
+    const headY = -bodyH / 2 - headR + 6 + (isWorking ? Math.sin(ts / 400) * 0.5 : 0)
     ctx.fillStyle = C.skinTone
     ctx.strokeStyle = C.skinShadow
     ctx.lineWidth = 1.5
     ctx.beginPath()
-    ctx.arc(hx, hy, headR, 0, Math.PI * 2)
+    ctx.arc(0, headY, headR, 0, Math.PI * 2)
     ctx.fill()
     ctx.stroke()
 
-    // Hair (small cap on top of head)
+    // Hair
     ctx.fillStyle = darken(colors.body, 0.4)
     ctx.beginPath()
-    ctx.arc(hx, hy - 2, headR - 1, Math.PI * 1.2, Math.PI * 1.8)
+    ctx.arc(0, headY - 2, headR - 1, Math.PI * 1.2, Math.PI * 1.8)
     ctx.fill()
-    if (isSelected) {
-      // Second hair bump for selected agents
-      ctx.beginPath()
-      ctx.arc(hx - 3, hy - 3, headR - 3, 0, Math.PI * 2)
-      ctx.fill()
-    }
 
-    // Eyes (two small dots)
+    // Eyes
     ctx.fillStyle = '#1a1a2a'
     ctx.beginPath()
-    ctx.arc(hx - 2.5, hy + 1, 1.2, 0, Math.PI * 2)
+    ctx.arc(-2.5, headY + 1, 1.2, 0, Math.PI * 2)
     ctx.fill()
     ctx.beginPath()
-    ctx.arc(hx + 2.5, hy + 1, 1.2, 0, Math.PI * 2)
+    ctx.arc(2.5, headY + 1, 1.2, 0, Math.PI * 2)
     ctx.fill()
 
-    // ── Status dot (pinned to body) ──
+    ctx.restore() // End rotation/translation
+
+    // ── Status dot (Relative to center, no rotation so it's always readable) ──
     const dotColor = STATUS_DOT[agent.status] || '#94a3b8'
+    ctx.save()
+    ctx.translate(x + 11, y + 10)
     ctx.beginPath()
-    ctx.arc(x + 11, y + 10, 4.5, 0, Math.PI * 2)
+    ctx.arc(0, 0, 4.5, 0, Math.PI * 2)
     ctx.fillStyle = '#fff'
     ctx.fill()
     ctx.strokeStyle = dotColor
     ctx.lineWidth = 2
     ctx.stroke()
     ctx.beginPath()
-    ctx.arc(x + 11, y + 10, 3, 0, Math.PI * 2)
+    ctx.arc(0, 0, 3, 0, Math.PI * 2)
     ctx.fillStyle = dotColor
     ctx.fill()
+    ctx.restore()
 
-    // ── Name tag (above agent) ──
+    // ── Name tag ──
     const nameTag = agent.name.split(' ')[0]
     ctx.font = 'bold 9px "Inter", system-ui, sans-serif'
     const tagW = ctx.measureText(nameTag).width + 12
     const tagH = 16
     const tagX = x - tagW / 2
-    const tagY = hy - headR - tagH - 4
+    const tagY = y - 30
 
-    // Tag background
+    ctx.save()
     ctx.fillStyle = isSelected ? hexAlpha(colors.body, 0.85) : 'rgba(255,255,255,0.85)'
     ctx.strokeStyle = isSelected ? colors.body : '#c8c4bc'
     ctx.lineWidth = 1
@@ -548,12 +589,9 @@ function drawAgents(ctx, agents, selectedId, ts) {
     ctx.fill()
     ctx.stroke()
 
-    // Tag text
     ctx.fillStyle = isSelected ? '#fff' : '#4a4a5a'
-    ctx.font = `${isSelected ? 'bold' : '600'} 9px "Inter", system-ui, sans-serif`
     ctx.textAlign = 'center'
     ctx.fillText(nameTag, x, tagY + tagH - 4)
-
     ctx.restore()
   })
 }
@@ -592,7 +630,7 @@ export function renderFrame(ctx, agents, selectedId, ts) {
   drawGrid(ctx)
   drawRooms(ctx)
   drawDoors(ctx)
-  drawFurniture(ctx, ts)
+  drawFurniture(ctx, ts, agents)
   drawPaths(ctx, agents)
   drawChatLinks(ctx, agents, ts)
   drawAgents(ctx, agents, selectedId, ts)
