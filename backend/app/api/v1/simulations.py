@@ -1,7 +1,5 @@
 import random
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
-
 from app.schemas import schemas
 from app.simulation.core.serializers import serialize_event, serialize_state
 from app.simulation.core.state_manager import (
@@ -13,15 +11,17 @@ from app.simulation.core.state_manager import (
     stop_auto_loop,
 )
 from app.simulation.core.ws_manager import ws_manager
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
 router = APIRouter(prefix="/simulations", tags=["simulations"])
 
 
 # ── REST: simulation lifecycle ─────────────────────────────
 
+
 @router.post("/", response_model=schemas.SimulationResponse)
 def create_simulation_endpoint(req: schemas.CreateSimulationRequest):
-    seed  = req.seed if req.seed is not None else random.randint(0, 2 ** 32 - 1)
+    seed = req.seed if req.seed is not None else random.randint(0, 2**32 - 1)
     state = create_simulation(seed)
     return _state_to_response(state)
 
@@ -56,7 +56,7 @@ async def reset_endpoint(sim_id: str):
 
 
 @router.post("/{sim_id}/start")
-def start_simulation_auto(sim_id: str, interval: float = 1.0):
+async def start_simulation_auto(sim_id: str, interval: float = 1.0):
     if not get_simulation(sim_id):
         raise HTTPException(404, "Simulation not found")
     start_auto_loop(sim_id, interval)
@@ -64,7 +64,7 @@ def start_simulation_auto(sim_id: str, interval: float = 1.0):
 
 
 @router.post("/{sim_id}/stop")
-def stop_simulation_auto(sim_id: str):
+async def stop_simulation_auto(sim_id: str):
     if not get_simulation(sim_id):
         raise HTTPException(404, "Simulation not found")
     stop_auto_loop(sim_id)
@@ -72,6 +72,7 @@ def stop_simulation_auto(sim_id: str):
 
 
 # ── WebSocket ──────────────────────────────────────────────
+
 
 @router.websocket("/{sim_id}/ws")
 async def simulation_ws(websocket: WebSocket, sim_id: str):
@@ -115,6 +116,7 @@ async def _handle_client_message(sim_id: str, msg: dict, ws: WebSocket) -> None:
 
 
 # ── Helper ─────────────────────────────────────────────────
+
 
 def _state_to_response(state) -> schemas.SimulationResponse:
     return schemas.SimulationResponse(
