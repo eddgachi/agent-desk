@@ -1,21 +1,22 @@
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
-from app.simulation.models.simulation_state import Agent, Event, Task
 from pydantic import BaseModel
 
 
 class CreateSimulationRequest(BaseModel):
-    seed: Optional[int] = None  # if None, generate random
+    seed: Optional[int] = None
 
 
 class SimulationResponse(BaseModel):
-    sim_id: str
+    sim_id:       str
     current_tick: int
-    agents: Dict[str, Agent]
-    tasks: Dict[str, Task]
-    event_log: List[Event]
+    running:      bool = False
+    # Plain dicts — avoids re-serialising Pydantic models twice
+    agents:    Dict[str, Any]
+    tasks:     Dict[str, Any]
+    event_log: List[Any]
 
 
 class TickResponse(BaseModel):
-    sim_id: str
+    sim_id:   str
     new_tick: int

@@ -1,2 +1,6 @@
 [flake8]
-ignore = E501
+# E501 – line too long (handled by editor)
+# E203 – whitespace before ':' (conflicts with black)
+# W503 – line break before binary operator (PEP 8 now recommends this style)
+ignore = E501,E203,W503
+max-line-length = 120

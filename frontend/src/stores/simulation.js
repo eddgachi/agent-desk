@@ -71,11 +71,12 @@ export const useSimulationStore = defineStore('simulation', () => {
   }
 
   function _applyState(data) {
-    if (data.sim_id)       currentSimId.value = data.sim_id
-    if (data.agents)       agents.value       = data.agents
-    if (data.tasks)        tasks.value        = data.tasks
-    if (data.event_log)    { /* delegated to events store */ }
+    if (data.sim_id)            currentSimId.value = data.sim_id
+    if (data.agents)            agents.value       = data.agents
+    if (data.tasks)             tasks.value        = data.tasks
     if (data.current_tick != null) currentTick.value = data.current_tick
+    if (data.running      != null) isRunning.value   = data.running
+    // event_log is delegated to events store via ws.js on state_snapshot
   }
 
   return {

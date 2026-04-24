@@ -71,7 +71,9 @@ services:
       - ./frontend:/app
       - /app/node_modules
     environment:
-      - VITE_API_URL=http://backend:8000
+      # Browser-facing: must be localhost (not Docker internal hostname)
+      - VITE_API_URL=http://localhost:8000
+      - VITE_WS_URL=ws://localhost:8000
     depends_on:
       - backend
     networks:

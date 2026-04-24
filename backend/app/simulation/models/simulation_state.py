@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -9,27 +9,9 @@ class AgentStatus(str, Enum):
     IDLE = "idle"
     WORKING = "working"
     MEETING = "meeting"
+    CHATTING = "chatting"
     BREAK = "break"
     MOVING = "moving"
-
-
-class Agent(BaseModel):
-    id: str
-    name: str
-    role: str
-    position_x: float
-    position_y: float
-    target_x: Optional[float] = None
-    target_y: Optional[float] = None
-    status: AgentStatus
-    current_task_id: Optional[str] = None
-    remaining_task_ticks: Optional[int] = None  # only if working
-    energy: int = 100
-    focus: int = 100
-    assigned_tasks: List[str] = (
-        []
-    )  # task ids assigned but not started? We'll simplify: only one task at a time
-    # Actually we can remove assigned_tasks and just use current_task_id + status
 
 
 class TaskStatus(str, Enum):
@@ -40,34 +22,83 @@ class TaskStatus(str, Enum):
     FAILED = "failed"
 
 
+class Agent(BaseModel):
+    id: str
+    name: str
+    role: str  # engineer | designer | manager | analyst
+    position_x: float
+    position_y: float
+    target_x: Optional[float] = None
+    target_y: Optional[float] = None
+    status: AgentStatus = AgentStatus.IDLE
+
+    # Stats (0-100)
+    energy: float = 100.0
+    focus: float = 100.0
+    mood: float = 75.0
+
+    # Task tracking
+    current_task_id: Optional[str] = None
+    remaining_task_ticks: Optional[int] = None
+
+    # Desk this agent is assigned to (canvas coords)
+    desk_id: Optional[str] = None
+    desk_x: Optional[float] = None
+    desk_y: Optional[float] = None
+
+    # Conversation state
+    conversation_partner_id: Optional[str] = None
+    conversation_ticks_left: int = 0
+
+    # Break cooldown (don't break again for N ticks)
+    last_break_tick: int = 0
+
+    # Working memory: last N event summaries this agent participated in
+    memory: List[str] = Field(default_factory=list)
+
+
 class Task(BaseModel):
     id: str
     title: str
     description: str
-    type: str  # "work", "meeting", "break"
-    duration_ticks: int
-    required_location: Optional[tuple[float, float]] = None  # (x,y)
-    required_role: Optional[str] = None
-    priority: int = 0  # higher = more important
-    deadline_tick: Optional[int] = None
-    assigned_agent_id: Optional[str] = None
+    type: str  # work | meeting | research | review | break
     status: TaskStatus = TaskStatus.PENDING
+    duration_ticks: int = 10
     remaining_ticks: Optional[int] = None
+
+    required_role: Optional[str] = None
+    required_location: Optional[List[float]] = None  # [x, y]
+
+    # For meeting tasks: all agents expected to participate
+    meeting_agent_ids: List[str] = Field(default_factory=list)
+    # Agents that have physically arrived at meeting location
+    checked_in_agent_ids: List[str] = Field(default_factory=list)
+
+    priority: int = 1
+    deadline_tick: Optional[int] = None
+
+    assigned_agent_id: Optional[str] = None
+    assigned_agents: List[str] = Field(default_factory=list)
+    completed_tick: Optional[int] = None
 
 
 class Event(BaseModel):
     event_id: str
     tick: int
     type: str
-    payload: dict
-    source: str  # "engine" or "agent"
+    payload: Dict[str, Any]
+    source: str = "engine"
 
 
 class SimulationState(BaseModel):
     sim_id: str
+    seed: int
     current_tick: int = 0
+    running: bool = False
+
     agents: Dict[str, Agent] = Field(default_factory=dict)
     tasks: Dict[str, Task] = Field(default_factory=dict)
     event_log: List[Event] = Field(default_factory=list)
-    seed: int
+
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
