@@ -23,7 +23,16 @@ def serialize_agent(agent: Agent) -> dict:
         "remaining_task_ticks": agent.remaining_task_ticks,
         "desk_id": agent.desk_id,
         "conversation_partner_id": agent.conversation_partner_id,
-        "memory": agent.memory[-5:],  # last 5 memories
+        "memory": agent.memory[-10:],
+        # ── Phase 7: Structured memory ──
+        "working_memory": agent.working_memory[-20:] if agent.working_memory else [],
+        "episodic_memory": agent.episodic_memory[-30:] if agent.episodic_memory else [],
+        "semantic_memory": agent.semantic_memory or {},
+        "memory_last_consolidation": agent.memory_last_consolidation,
+        # ── Phase 8/9: LLM explanations ──
+        "llm_explanation": agent.llm_explanation,
+        "llm_feeling": agent.llm_feeling,
+        "llm_next_plan": agent.llm_next_plan,
     }
 
 

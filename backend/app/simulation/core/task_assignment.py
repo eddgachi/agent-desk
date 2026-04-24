@@ -1,4 +1,5 @@
 import math
+from typing import List, Tuple
 
 from app.simulation.core.event_logger import add_event
 from app.simulation.models.simulation_state import (
@@ -8,20 +9,26 @@ from app.simulation.models.simulation_state import (
 )
 
 
-def assign_tasks(state: SimulationState, rng) -> SimulationState:
+def assign_tasks(state: SimulationState, rng) -> List[Tuple[str, str]]:
     """
     Greedy task assignment:
       - Sort pending tasks by priority (desc) then deadline (asc).
       - For each task, find the best eligible idle agent.
       - Agents with very low focus or energy are not assigned new work tasks.
+
+    Returns:
+        List of (agent_id, task_id) pairs that were assigned.
     """
     pending = [t for t in state.tasks.values() if t.status == TaskStatus.PENDING]
     pending.sort(key=lambda t: (-t.priority, t.deadline_tick or 999_999))
 
     eligible = [
-        a for a in state.agents.values()
+        a
+        for a in state.agents.values()
         if a.status == AgentStatus.IDLE and a.current_task_id is None
     ]
+
+    assigned_pairs: List[Tuple[str, str]] = []
 
     for task in pending:
         best_agent = None
@@ -54,7 +61,7 @@ def assign_tasks(state: SimulationState, rng) -> SimulationState:
             continue
 
         # Assign
-        task.status           = TaskStatus.ASSIGNED
+        task.status = TaskStatus.ASSIGNED
         task.assigned_agent_id = best_agent.id
         if best_agent.id not in task.assigned_agents:
             task.assigned_agents.append(best_agent.id)
@@ -64,26 +71,35 @@ def assign_tasks(state: SimulationState, rng) -> SimulationState:
             lx, ly = task.required_location
             best_agent.target_x = float(lx)
             best_agent.target_y = float(ly)
-            best_agent.status   = AgentStatus.MOVING
+            best_agent.status = AgentStatus.MOVING
         else:
-            best_agent.status              = AgentStatus.WORKING
+            best_agent.status = AgentStatus.WORKING
             best_agent.remaining_task_ticks = task.duration_ticks
-            task.status                    = TaskStatus.IN_PROGRESS
-            task.remaining_ticks           = task.duration_ticks
-            add_event(state, "task_started", {
-                "task_id":    task.id,
-                "task_title": task.title,
-                "agent_id":   best_agent.id,
-                "agent_name": best_agent.name,
-            })
+            task.status = TaskStatus.IN_PROGRESS
+            task.remaining_ticks = task.duration_ticks
+            add_event(
+                state,
+                "task_started",
+                {
+                    "task_id": task.id,
+                    "task_title": task.title,
+                    "agent_id": best_agent.id,
+                    "agent_name": best_agent.name,
+                },
+            )
 
-        add_event(state, "task_assigned", {
-            "task_id":    task.id,
-            "task_title": task.title,
-            "agent_id":   best_agent.id,
-            "agent_name": best_agent.name,
-        })
+        add_event(
+            state,
+            "task_assigned",
+            {
+                "task_id": task.id,
+                "task_title": task.title,
+                "agent_id": best_agent.id,
+                "agent_name": best_agent.name,
+            },
+        )
 
         eligible.remove(best_agent)
+        assigned_pairs.append((best_agent.id, task.id))
 
-    return state
+    return assigned_pairs

@@ -11,8 +11,13 @@ Order of operations per tick:
   8. Assign pending tasks to eligible idle agents
   9. Initiate spontaneous conversations
   10. Idle agents may wander
-  11. Increment tick counter
+  11. Memory consolidation (periodic)
+  12. LLM explanation generation (periodic, low priority)
+  13. Increment tick counter
 """
+
+import logging
+
 from app.simulation.core.event_logger import add_event
 from app.simulation.core.interaction import (
     process_break_arrival,
@@ -23,10 +28,8 @@ from app.simulation.core.interaction import (
     process_meeting_checkin,
     process_stat_decay,
 )
-from app.simulation.core.movement import (
-    choose_wander_target,
-    move_agent_towards_target,
-)
+from app.simulation.core.movement import choose_wander_target, move_agent_towards_target
+from app.simulation.core.runtime_manager import get_runtime
 from app.simulation.core.task_assignment import assign_tasks
 from app.simulation.models.simulation_state import (
     AgentStatus,
@@ -34,8 +37,19 @@ from app.simulation.models.simulation_state import (
     TaskStatus,
 )
 
+logger = logging.getLogger(__name__)
+
+# How often to sync runtime data back to agent models (ticks)
+SYNC_INTERVAL = 5
+
+# How often to attempt LLM explanation generation
+LLM_EXPLANATION_INTERVAL = 15
+
 
 def process_tick(state: SimulationState, rng) -> SimulationState:
+    sim_id = state.sim_id
+    rt = get_runtime(sim_id)
+
     # 1. Stat decay
     process_stat_decay(state, rng)
 
@@ -62,12 +76,20 @@ def process_tick(state: SimulationState, rng) -> SimulationState:
                 agent.remaining_task_ticks = task.duration_ticks
                 task.status = TaskStatus.IN_PROGRESS
                 task.remaining_ticks = task.duration_ticks
-                add_event(state, "task_started", {
-                    "task_id":    task.id,
-                    "task_title": task.title,
-                    "agent_id":   agent.id,
-                    "agent_name": agent.name,
-                })
+                add_event(
+                    state,
+                    "task_started",
+                    {
+                        "task_id": task.id,
+                        "task_title": task.title,
+                        "agent_id": agent.id,
+                        "agent_name": agent.name,
+                    },
+                )
+                # Record in memory
+                mem = rt.get_memory(agent.id)
+                if mem:
+                    mem.record_task_started(state.current_tick, task.title, task.id)
         # If no task (wanderer / break-returner): idle, maybe wander again
         elif rng.random() < 0.25:
             tx, ty = choose_wander_target(agent, rng)
@@ -85,23 +107,31 @@ def process_tick(state: SimulationState, rng) -> SimulationState:
         if agent.remaining_task_ticks <= 0:
             task = state.tasks.get(agent.current_task_id or "")
             if task:
-                task.status       = TaskStatus.COMPLETED
+                task.status = TaskStatus.COMPLETED
                 task.completed_tick = state.current_tick
-                add_event(state, "task_completed", {
-                    "task_id":    task.id,
-                    "task_title": task.title,
-                    "agent_id":   agent.id,
-                    "agent_name": agent.name,
-                })
+                add_event(
+                    state,
+                    "task_completed",
+                    {
+                        "task_id": task.id,
+                        "task_title": task.title,
+                        "agent_id": agent.id,
+                        "agent_name": agent.name,
+                    },
+                )
                 # Boost mood on completion
                 agent.mood = min(100.0, agent.mood + 5.0)
-                agent.memory.append(f"Tick {state.current_tick}: completed '{task.title}'")
-                if len(agent.memory) > 20:
-                    agent.memory = agent.memory[-20:]
 
-            agent.current_task_id      = None
+                # Record in memory
+                mem = rt.get_memory(agent.id)
+                if mem:
+                    mem.record_task_completed(
+                        state.current_tick, task.title, task.id, task.type
+                    )
+
+            agent.current_task_id = None
             agent.remaining_task_ticks = None
-            agent.status               = AgentStatus.IDLE
+            agent.status = AgentStatus.IDLE
 
     # 6. Tick MEETING agents (meeting task countdown handled via task)
     for task in state.tasks.values():
@@ -117,20 +147,29 @@ def process_tick(state: SimulationState, rng) -> SimulationState:
             for aid in list(task.checked_in_agent_ids):
                 agent = state.agents.get(aid)
                 if agent:
-                    agent.status              = AgentStatus.IDLE
-                    agent.current_task_id     = None
+                    agent.status = AgentStatus.IDLE
+                    agent.current_task_id = None
                     agent.remaining_task_ticks = None
-                    agent.memory.append(f"Tick {state.current_tick}: attended '{task.title}'")
-            add_event(state, "meeting_ended", {
-                "task_id":    task.id,
-                "task_title": task.title,
-                "agent_ids":  list(task.checked_in_agent_ids),
-                "agent_name": ", ".join(
-                    state.agents[aid].name
-                    for aid in task.checked_in_agent_ids
-                    if aid in state.agents
-                ),
-            })
+
+                    # Record in memory
+                    mem = rt.get_memory(agent.id)
+                    if mem:
+                        other_agents = [
+                            state.agents[oid].name
+                            for oid in task.checked_in_agent_ids
+                            if oid != aid and oid in state.agents
+                        ]
+                        mem.record_meeting(state.current_tick, task.title, other_agents)
+
+            add_event(
+                state,
+                "meeting_ended",
+                {
+                    "task_id": task.id,
+                    "task_title": task.title,
+                    "agent_ids": list(task.checked_in_agent_ids),
+                },
+            )
             task.checked_in_agent_ids = []
 
     # 7. Check deadlines
@@ -140,15 +179,27 @@ def process_tick(state: SimulationState, rng) -> SimulationState:
                 task.status = TaskStatus.FAILED
                 agent = state.agents.get(task.assigned_agent_id or "")
                 if agent and agent.current_task_id == task.id:
-                    agent.current_task_id      = None
+                    agent.current_task_id = None
                     agent.remaining_task_ticks = None
-                    agent.status               = AgentStatus.IDLE
+                    agent.status = AgentStatus.IDLE
                     agent.mood = max(0.0, agent.mood - 10.0)
-                add_event(state, "task_failed", {
-                    "task_id":    task.id,
-                    "task_title": task.title,
-                    "reason":     "deadline missed",
-                })
+
+                    # Record in memory
+                    mem = rt.get_memory(agent.id)
+                    if mem:
+                        mem.record_task_failed(
+                            state.current_tick, task.title, "deadline missed"
+                        )
+
+                add_event(
+                    state,
+                    "task_failed",
+                    {
+                        "task_id": task.id,
+                        "task_title": task.title,
+                        "reason": "deadline missed",
+                    },
+                )
 
     # 8. Break logic
     process_break_arrival(state)
@@ -156,10 +207,31 @@ def process_tick(state: SimulationState, rng) -> SimulationState:
     process_break_end(state, rng)
 
     # 9. Assign new tasks
-    assign_tasks(state, rng)
+    assigned_agents = assign_tasks(state, rng)
+
+    # Record task assignments in memory
+    for agent_id, task_id in assigned_agents:
+        mem = rt.get_memory(agent_id)
+        if mem:
+            task = state.tasks.get(task_id)
+            if task:
+                mem.record_task_assigned(state.current_tick, task.title, task_id)
 
     # 10. Spontaneous conversations
-    process_conversations(state, rng)
+    chat_pairs = process_conversations(state, rng)
+
+    # Record conversation starts in memory
+    for a1_id, a2_id in chat_pairs:
+        a1 = state.agents.get(a1_id)
+        a2 = state.agents.get(a2_id)
+        if a1:
+            mem1 = rt.get_memory(a1_id)
+            if mem1 and a2:
+                mem1.record_chat_started(state.current_tick, a2.name, a2_id)
+        if a2:
+            mem2 = rt.get_memory(a2_id)
+            if mem2 and a1:
+                mem2.record_chat_started(state.current_tick, a1.name, a1_id)
 
     # 11. Idle wandering
     for agent in state.agents.values():
@@ -168,11 +240,25 @@ def process_tick(state: SimulationState, rng) -> SimulationState:
                 tx, ty = choose_wander_target(agent, rng)
                 agent.target_x, agent.target_y = tx, ty
                 agent.status = AgentStatus.MOVING
-                add_event(state, "agent_wandering", {
-                    "agent_id":   agent.id,
-                    "agent_name": agent.name,
-                    "target":     {"x": tx, "y": ty},
-                })
+                add_event(
+                    state,
+                    "agent_wandering",
+                    {
+                        "agent_id": agent.id,
+                        "agent_name": agent.name,
+                        "target": {"x": tx, "y": ty},
+                    },
+                )
+
+    # 12. Memory consolidation (periodic)
+    for agent in state.agents.values():
+        mem = rt.get_memory(agent.id)
+        if mem:
+            mem.maybe_consolidate(state.current_tick)
+
+    # 13. Sync runtime → agent models (periodic, for frontend transport)
+    if state.current_tick % SYNC_INTERVAL == 0:
+        rt.sync_to_agents(state.agents)
 
     state.current_tick += 1
     return state

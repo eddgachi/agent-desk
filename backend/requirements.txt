@@ -7,3 +7,4 @@ celery==5.3.4
 pydantic==2.5.0
 pydantic-settings==2.1.0
 prometheus-client==0.19.0
+httpx==0.25.2

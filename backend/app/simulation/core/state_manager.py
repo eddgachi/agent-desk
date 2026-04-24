@@ -2,6 +2,7 @@
 In-memory simulation state store + tick loop with WebSocket broadcasting.
 All simulation state lives here during a server session.
 """
+
 import asyncio
 import uuid
 from typing import Dict, Optional
@@ -9,6 +10,7 @@ from typing import Dict, Optional
 from app.simulation.core.engine import process_tick
 from app.simulation.core.event_logger import add_event
 from app.simulation.core.random_gen import clear_rng, get_rng
+from app.simulation.core.runtime_manager import clear_runtime, get_runtime
 from app.simulation.core.serializers import serialize_event, serialize_tick_update
 from app.simulation.core.ws_manager import ws_manager
 from app.simulation.models.simulation_state import (
@@ -20,70 +22,142 @@ from app.simulation.models.simulation_state import (
 
 # ── In-memory stores ───────────────────────────────────────
 _state_store: Dict[str, SimulationState] = {}
-_loop_tasks:  Dict[str, asyncio.Task]    = {}
-_loop_flags:  Dict[str, bool]            = {}
+_loop_tasks: Dict[str, asyncio.Task] = {}
+_loop_flags: Dict[str, bool] = {}
 
 # ── Agent definitions (canvas-space coordinates) ───────────
 # Desk centres from officeLayout.js:
 #   makeDeskRow(60, 70, 4, 'A')  → centres at (100,96),(228,96),(356,96),(484,96)
 #   makeDeskRow(60, 170, 4, 'B') → centres at (100,196),(228,196),(356,196),(484,196)
 _AGENT_DEFS = [
-    ("agent_alice",   "Alice",   "engineer", 100.0,  96.0,  "desk_A1"),
-    ("agent_bob",     "Bob",     "designer", 228.0,  96.0,  "desk_A2"),
-    ("agent_charlie", "Charlie", "manager",  356.0,  96.0,  "desk_A3"),
-    ("agent_diana",   "Diana",   "engineer", 484.0,  96.0,  "desk_A4"),
-    ("agent_eve",     "Eve",     "analyst",  100.0, 196.0,  "desk_B1"),
-    ("agent_frank",   "Frank",   "designer", 228.0, 196.0,  "desk_B2"),
+    ("agent_alice", "Alice", "engineer", 100.0, 96.0, "desk_A1"),
+    ("agent_bob", "Bob", "designer", 228.0, 96.0, "desk_A2"),
+    ("agent_charlie", "Charlie", "manager", 356.0, 96.0, "desk_A3"),
+    ("agent_diana", "Diana", "engineer", 484.0, 96.0, "desk_A4"),
+    ("agent_eve", "Eve", "analyst", 100.0, 196.0, "desk_B1"),
+    ("agent_frank", "Frank", "designer", 228.0, 196.0, "desk_B2"),
 ]
 
 # Meeting room centres
 _MEETING_A = [744.0, 120.0]
 _MEETING_B = [744.0, 313.0]
 
+
 # ── Task catalogue ─────────────────────────────────────────
 def _make_tasks() -> Dict[str, Task]:
     """Generate a rich set of initial tasks."""
     defs = [
         # (id, title, desc, type, duration, location, role, priority, deadline_offset)
-        ("task_sprint_plan", "Sprint Planning",
-         "Plan the upcoming sprint with the team",
-         "meeting", 12, _MEETING_A, None, 5, 60),
-
-        ("task_code_review", "Code Review",
-         "Review open pull requests",
-         "review", 8, None, "engineer", 4, 80),
-
-        ("task_design_mockup", "UI Mockups",
-         "Design mockups for the new dashboard",
-         "work", 14, None, "designer", 4, 90),
-
-        ("task_research", "Tech Research",
-         "Research suitable database migration strategy",
-         "research", 10, None, "analyst", 3, None),
-
-        ("task_arch_review", "Architecture Review",
-         "Review and document system architecture",
-         "meeting", 8, _MEETING_B, "manager", 3, 100),
-
-        ("task_bug_triage", "Bug Triage",
-         "Review and prioritize open bug reports",
-         "review", 6, None, "engineer", 3, 70),
-
-        ("task_analytics", "Analytics Report",
-         "Compile and analyse this week's usage data",
-         "work", 12, None, "analyst", 2, None),
-
-        ("task_onboarding", "Onboarding Docs",
-         "Update onboarding documentation",
-         "work", 9, None, None, 2, None),
-
-        ("task_1on1", "1-on-1 Meeting",
-         "Manager check-ins with team members",
-         "meeting", 6, _MEETING_B, "manager", 2, None),
-
-        ("task_refactor", "Refactoring",
-         "Clean up the authentication module",
-         "work", 15, None, "engineer", 1, None),
+        (
+            "task_sprint_plan",
+            "Sprint Planning",
+            "Plan the upcoming sprint with the team",
+            "meeting",
+            12,
+            _MEETING_A,
+            None,
+            5,
+            60,
+        ),
+        (
+            "task_code_review",
+            "Code Review",
+            "Review open pull requests",
+            "review",
+            8,
+            None,
+            "engineer",
+            4,
+            80,
+        ),
+        (
+            "task_design_mockup",
+            "UI Mockups",
+            "Design mockups for the new dashboard",
+            "work",
+            14,
+            None,
+            "designer",
+            4,
+            90,
+        ),
+        (
+            "task_research",
+            "Tech Research",
+            "Research suitable database migration strategy",
+            "research",
+            10,
+            None,
+            "analyst",
+            3,
+            None,
+        ),
+        (
+            "task_arch_review",
+            "Architecture Review",
+            "Review and document system architecture",
+            "meeting",
+            8,
+            _MEETING_B,
+            "manager",
+            3,
+            100,
+        ),
+        (
+            "task_bug_triage",
+            "Bug Triage",
+            "Review and prioritize open bug reports",
+            "review",
+            6,
+            None,
+            "engineer",
+            3,
+            70,
+        ),
+        (
+            "task_analytics",
+            "Analytics Report",
+            "Compile and analyse this week's usage data",
+            "work",
+            12,
+            None,
+            "analyst",
+            2,
+            None,
+        ),
+        (
+            "task_onboarding",
+            "Onboarding Docs",
+            "Update onboarding documentation",
+            "work",
+            9,
+            None,
+            None,
+            2,
+            None,
+        ),
+        (
+            "task_1on1",
+            "1-on-1 Meeting",
+            "Manager check-ins with team members",
+            "meeting",
+            6,
+            _MEETING_B,
+            "manager",
+            2,
+            None,
+        ),
+        (
+            "task_refactor",
+            "Refactoring",
+            "Clean up the authentication module",
+            "work",
+            15,
+            None,
+            "engineer",
+            1,
+            None,
+        ),
     ]
 
     tasks = {}
@@ -105,9 +179,10 @@ def _make_tasks() -> Dict[str, Task]:
 
 # ── Public API ─────────────────────────────────────────────
 
+
 def create_simulation(seed: int) -> SimulationState:
     sim_id = str(uuid.uuid4())
-    rng    = get_rng(sim_id, seed)
+    rng = get_rng(sim_id, seed)
 
     agents: Dict[str, Agent] = {}
     for aid, name, role, px, py, desk_id in _AGENT_DEFS:
@@ -130,11 +205,21 @@ def create_simulation(seed: int) -> SimulationState:
     state = SimulationState(sim_id=sim_id, agents=agents, tasks=tasks, seed=seed)
     _state_store[sim_id] = state
 
-    add_event(state, "simulation_created", {
-        "sim_id": sim_id,
-        "seed":   seed,
-        "agents": [a.name for a in agents.values()],
-    })
+    # ── Phase 7/9: Initialize runtime memory & decisions ──
+    rt = get_runtime(sim_id)
+    for aid, name, role, _, _, _ in _AGENT_DEFS:
+        rt.initialize_agent(aid, name, role)
+    rt.sync_to_agents(state.agents)
+
+    add_event(
+        state,
+        "simulation_created",
+        {
+            "sim_id": sim_id,
+            "seed": seed,
+            "agents": [a.name for a in agents.values()],
+        },
+    )
     return state
 
 
@@ -152,8 +237,9 @@ def reset_simulation(sim_id: str) -> Optional[SimulationState]:
     old = _state_store[sim_id]
     stop_auto_loop(sim_id)
     clear_rng(sim_id)
+    clear_runtime(sim_id)
     new = create_simulation(old.seed)
-    new.sim_id = sim_id          # keep same ID so frontend WS stays connected
+    new.sim_id = sim_id  # keep same ID so frontend WS stays connected
     _state_store[sim_id] = new
     return new
 
@@ -164,8 +250,8 @@ async def apply_tick(sim_id: str) -> int:
     if not state:
         raise ValueError(f"Simulation not found: {sim_id}")
 
-    rng            = get_rng(sim_id, state.seed)
-    events_before  = len(state.event_log)
+    rng = get_rng(sim_id, state.seed)
+    events_before = len(state.event_log)
 
     process_tick(state, rng)
     update_simulation(state)
@@ -182,6 +268,7 @@ async def apply_tick(sim_id: str) -> int:
 
 
 # ── Auto-loop ──────────────────────────────────────────────
+
 
 async def _run_auto_loop(sim_id: str, interval: float) -> None:
     while not _loop_flags.get(sim_id, False):

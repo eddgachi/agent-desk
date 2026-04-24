@@ -9,6 +9,7 @@ Handles:
 """
 
 import math
+from typing import List, Tuple
 
 from app.simulation.core.event_logger import add_event
 from app.simulation.models.simulation_state import (
@@ -136,8 +137,13 @@ def process_break_end(state: SimulationState, rng) -> None:
                 agent.status = AgentStatus.MOVING
 
 
-def process_conversations(state: SimulationState, rng) -> None:
-    """Spontaneous chat between nearby idle agents."""
+def process_conversations(state: SimulationState, rng) -> List[Tuple[str, str]]:
+    """
+    Spontaneous chat between nearby idle agents.
+
+    Returns:
+        List of (agent_a_id, agent_b_id) pairs that started chatting.
+    """
     idle_agents = [
         a
         for a in state.agents.values()
@@ -145,6 +151,8 @@ def process_conversations(state: SimulationState, rng) -> None:
     ]
 
     paired = set()
+    started_pairs: List[Tuple[str, str]] = []
+
     for i, a1 in enumerate(idle_agents):
         if a1.id in paired:
             continue
@@ -170,6 +178,7 @@ def process_conversations(state: SimulationState, rng) -> None:
 
             paired.add(a1.id)
             paired.add(a2.id)
+            started_pairs.append((a1.id, a2.id))
 
             add_event(
                 state,
@@ -182,6 +191,8 @@ def process_conversations(state: SimulationState, rng) -> None:
                 },
             )
             break
+
+    return started_pairs
 
 
 def process_conversation_tick(state: SimulationState, rng) -> None:
@@ -248,10 +259,5 @@ def process_meeting_checkin(state: SimulationState) -> None:
                     "task_id": task.id,
                     "task_title": task.title,
                     "agent_ids": list(task.checked_in_agent_ids),
-                    "agent_name": ", ".join(
-                        state.agents[aid].name
-                        for aid in task.checked_in_agent_ids
-                        if aid in state.agents
-                    ),
                 },
             )
