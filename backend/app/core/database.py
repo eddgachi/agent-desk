@@ -1,3 +1,4 @@
+from sqlalchemy import text
 from app.config import settings
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
@@ -9,4 +10,4 @@ Base = declarative_base()
 
 async def test_db_connection():
     async with engine.connect() as conn:
-        await conn.execute("SELECT 1")
+        await conn.execute(text("SELECT 1"))
