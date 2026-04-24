@@ -1,4 +1,5 @@
 from app.api.health import router as health_router
+from app.api.v1 import simulations as v1_simulations
 from app.core.database import engine, test_db_connection
 from app.core.redis_client import redis_client
 from fastapi import FastAPI
@@ -22,6 +23,8 @@ app.mount("/metrics", metrics_app)
 
 # Include routers
 app.include_router(health_router, prefix="/health", tags=["health"])
+
+app.include_router(v1_simulations.router, prefix="/api/v1")
 
 
 @app.on_event("startup")
