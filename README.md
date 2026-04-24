@@ -2,8 +2,7 @@
 
 ### 🎥 Demo Recording
 
-![AgentDesk Simulation Demo](path/to/your/recording.gif)
-_Placeholder: Replace with your actual recording path or GIF_
+![AgentDesk Simulation Demo](screenshots/agent-desk-screencast.gif)
 
 ---
 
