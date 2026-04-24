@@ -1,23 +1,19 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Home from '../views/Home.vue'
-import SimulationView from '../views/SimulationView.vue'
+import OfficeView from '../views/OfficeView.vue'
 
 const routes = [
   {
     path: '/',
-    name: 'Home',
-    component: Home,
+    redirect: '/office',
   },
   {
-    path: '/simulation',
-    name: 'Simulation',
-    component: SimulationView,
+    path: '/office',
+    name: 'Office',
+    component: OfficeView,
   },
 ]
 
-const router = createRouter({
+export default createRouter({
   history: createWebHistory(),
   routes,
 })
-
-export default router
